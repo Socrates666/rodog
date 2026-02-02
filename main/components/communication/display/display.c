@@ -8,6 +8,7 @@
 #include "driver/gpio.h"
 #include "driver/i2c.h"
 #include "ssd1306.h"
+#include "board.h"
 
 // Tag for logging
 static const char* TAG = "display";
@@ -15,14 +16,6 @@ static const char* TAG = "display";
 // Display dimensions
 #define DISPLAY_WIDTH  128
 #define DISPLAY_HEIGHT 64
-
-// I2C configuration
-#define I2C_MASTER_SCL_IO          22    // GPIO number for I2C master clock
-#define I2C_MASTER_SDA_IO          21    // GPIO number for I2C master data
-#define I2C_MASTER_NUM             I2C_NUM_0
-#define I2C_MASTER_FREQ_HZ         400000
-#define I2C_MASTER_TX_BUF_DISABLE  0
-#define I2C_MASTER_RX_BUF_DISABLE  0
 
 // OLED display address
 #define OLED_ADDR   0x3C
@@ -53,31 +46,18 @@ static SemaphoreHandle_t g_display_mutex = NULL;
 
 /**
  * @brief Initialize I2C for OLED display
+ * 
+ * Uses the existing I2C bus initialized by bsp_i2c_init()
  */
 static bool i2c_master_init(void) {
-    i2c_config_t conf = {
-        .mode = I2C_MODE_MASTER,
-        .sda_io_num = I2C_MASTER_SDA_IO,
-        .scl_io_num = I2C_MASTER_SCL_IO,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = I2C_MASTER_FREQ_HZ,
-    };
-
-    esp_err_t ret = i2c_param_config(I2C_MASTER_NUM, &conf);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "i2c_param_config failed: %s", esp_err_to_name(ret));
+    // Check if I2C is already initialized by the board support package
+    i2c_master_bus_handle_t i2c_handle = bsp_i2c_get_handle();
+    if (i2c_handle == NULL) {
+        ESP_LOGE(TAG, "I2C bus not initialized. Call bsp_i2c_init() first.");
         return false;
     }
-
-    ret = i2c_driver_install(I2C_MASTER_NUM, conf.mode,
-                             I2C_MASTER_RX_BUF_DISABLE,
-                             I2C_MASTER_TX_BUF_DISABLE, 0);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "i2c_driver_install failed: %s", esp_err_to_name(ret));
-        return false;
-    }
-
+    
+    ESP_LOGI(TAG, "Using existing I2C bus");
     return true;
 }
 
@@ -144,7 +124,7 @@ bool display_init(void) {
         return false;
     }
     
-    // Initialize I2C
+    // Check I2C initialization
     if (!i2c_master_init()) {
         ESP_LOGE(TAG, "Failed to initialize I2C");
         vSemaphoreDelete(g_display_mutex);
@@ -154,7 +134,6 @@ bool display_init(void) {
     // Initialize OLED
     if (!oled_init()) {
         ESP_LOGE(TAG, "Failed to initialize OLED");
-        i2c_driver_delete(I2C_MASTER_NUM);
         vSemaphoreDelete(g_display_mutex);
         return false;
     }
@@ -177,9 +156,6 @@ void display_deinit(void) {
     
     // Clear display
     ssd1306_clear_screen(&g_dev, false);
-    
-    // Delete I2C driver
-    i2c_driver_delete(I2C_MASTER_NUM);
     
     ESP_LOGI(TAG, "Display module deinitialized");
 }
