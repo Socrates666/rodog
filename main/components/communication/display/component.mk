@@ -1,7 +1,0 @@
-# Display component makefile
-
-COMPONENT_SRCDIRS := .
-COMPONENT_ADD_INCLUDEDIRS := .
-
-COMPONENT_REQUIRES := freertos driver
-COMPONENT_PRIV_REQUIRES := ssd1306 board
