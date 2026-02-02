@@ -1,0 +1,7 @@
+# Display component makefile
+
+COMPONENT_SRCDIRS := .
+COMPONENT_ADD_INCLUDEDIRS := .
+
+COMPONENT_REQUIRES := freertos driver i2c_dev
+COMPONENT_PRIV_REQUIRES := ssd1306
