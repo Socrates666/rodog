@@ -1,86 +1,73 @@
-menu "Example Configuration"
+menu "Communication settings"
 
-    choice ESPNOW_WIFI_MODE
-        prompt "WiFi mode"
-        default ESPNOW_WIFI_MODE_STATION
+    config COMM_MICRO_ROS_UART_ENABLE
+        bool "Enable micro-ROS UART module"
+        default n
         help
-            WiFi mode(station or softap).
+            Enable micro-ROS node over UART for servo control.
 
-        config ESPNOW_WIFI_MODE_STATION
-            bool "Station"
-        config ESPNOW_WIFI_MODE_STATION_SOFTAP
-            bool "Softap"
-    endchoice
-
-    config ESPNOW_PMK
-        string "ESPNOW primary master key"
-        default "pmk1234567890123"
+    config COMM_MICRO_ROS_UART_PORT
+        int "micro-ROS UART port"
+        default 0
+        range 0 2
+        depends on COMM_MICRO_ROS_UART_ENABLE
         help
-            ESPNOW primary master for the example to use. The length of ESPNOW primary master must be 16 bytes.
+            UART port number (0-2) for micro-ROS transport.
 
-    config ESPNOW_LMK
-        string "ESPNOW local master key"
-        default "lmk1234567890123"
+    config COMM_MICRO_ROS_UART_BAUD
+        int "micro-ROS UART baud rate"
+        default 115200
+        depends on COMM_MICRO_ROS_UART_ENABLE
         help
-            ESPNOW local master for the example to use. The length of ESPNOW local master must be 16 bytes.
+            UART baud rate for micro-ROS transport.
 
-    config ESPNOW_CHANNEL
-        int "Channel"
-        default 1
-        range 0 14
+    config COMM_MICRO_ROS_UART_RX_BUFFER
+        int "micro-ROS UART RX buffer size"
+        default 1024
+        depends on COMM_MICRO_ROS_UART_ENABLE
         help
-            The channel on which sending and receiving ESPNOW data.
+            UART driver RX buffer size.
 
-    config ESPNOW_SEND_COUNT
-        int "Send count"
-        default 100
-        range 1 65535
+    config COMM_MICRO_ROS_UART_TX_BUFFER
+        int "micro-ROS UART TX buffer size"
+        default 0
+        depends on COMM_MICRO_ROS_UART_ENABLE
         help
-            Total count of unicast ESPNOW data to be sent.
+            UART driver TX buffer size.
 
-    config ESPNOW_SEND_DELAY
-        int "Send delay"
-        default 1000
-        range 0 65535
+    config COMM_MICRO_ROS_NODE_NAME
+        string "micro-ROS node name"
+        default "rodog_uart_node"
+        depends on COMM_MICRO_ROS_UART_ENABLE
         help
-            Delay between sending two ESPNOW data, unit: ms.
+            micro-ROS node name for UART transport.
 
-    config ESPNOW_SEND_LEN
-        int "Send len"
-        range 10 1470
-        default 10
+    config COMM_MICRO_ROS_SERVO_TOPIC
+        string "micro-ROS servo command topic"
+        default "/rodog/servo_cmd"
+        depends on COMM_MICRO_ROS_UART_ENABLE
         help
-            Length of ESPNOW data to be sent, unit: byte.
+            Topic name for servo command subscription.
 
-    config ESPNOW_ENABLE_LONG_RANGE
-        bool "Enable Long Range"
-        default "n"
+endmenu
+
+menu "Control settings"
+
+    config CONTROL_CALIBRATION_ENABLE
+        bool "Enable servo calibration from NVS"
+        default y
         help
-            When enable long range, the PHY rate of ESP32 will be 512Kbps or 256Kbps
+            When enabled, servo middle positions are loaded from NVS and updates
+            are persisted. When disabled, built-in defaults are used and no NVS
+            writes occur.
 
-    config ESPNOW_ENABLE_POWER_SAVE
-        bool "Enable ESPNOW Power Save"
-        default "n"
-        select ESP_WIFI_STA_DISCONNECTED_PM_ENABLE
-        depends on ESPNOW_WIFI_MODE_STATION
-        help
-            With ESPNOW power save enabled, chip would be able to wakeup and sleep periodically
-            Notice ESP_WIFI_STA_DISCONNECTED_PM_ENABLE is essential at Wi-Fi disconnected
-
-    config ESPNOW_WAKE_WINDOW
-        int "ESPNOW wake window, unit in millisecond"
-        range 0 65535
+    config CONTROL_SERVO_FREQ_HZ
+        int "Servo PWM frequency (Hz)"
         default 50
-        depends on ESPNOW_ENABLE_POWER_SAVE
+        range 40 300
         help
-            ESPNOW wake window
-
-    config ESPNOW_WAKE_INTERVAL
-        int "ESPNOW wake interval, unit in millisecond"
-        range 1 65535
-        default 100
-        depends on ESPNOW_ENABLE_POWER_SAVE
-        help
-            ESPNOW wake interval
+            PWM frequency used for PCA9685 servo control. Keep at 50 Hz for
+            standard RC servos unless you know the hardware supports higher
+            rates.
 
 endmenu

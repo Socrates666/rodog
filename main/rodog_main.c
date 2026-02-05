@@ -19,10 +19,11 @@
 #include "nvs_flash.h"
 #include "board.h"
 #include "leg.h"
-#include "now_controler.h"
 #include "esp_log.h"
 #include "web_server.h"
-#include "display.h"
+#include "micro_ros_uart.h"
+#include "calibration.h"
+#include "pca9685.h"
 
 static const char* TAG = "MAIN";
 
@@ -35,7 +36,14 @@ void atask(void* vParamter){
         ESP_LOGI("accel", "x:%.2f  y:%.2f  z:%.2f", data.x, data.y, data.z);
         vTaskDelay(300 / portTICK_PERIOD_MS);
     }
+}
 
+static float pwm_to_angle(uint16_t pwm){
+    return (float)(pwm*1000000/4096/50-500)/2000*180;
+}
+
+static uint16_t angle_to_pwm(float angle){
+    return (500+(angle/180)*2000)*50*4096/1000000;
 }
 
 void app_main(void)
@@ -69,27 +77,40 @@ void app_main(void)
     if(ret != ESP_OK){
         ESP_LOGE(TAG, "PCA9685初始化失败");
     }
-    
-    // Initialize and start display module
-    ESP_LOGI(TAG, "Initializing display module");
-    if (!display_init()) {
-        ESP_LOGE(TAG, "Display module initialization failed");
-    } else {
-        // Create display task
-        xTaskCreate(display_task, "display_task", 4096, NULL, 2, NULL);
-        ESP_LOGI(TAG, "Display task created");
-        
-        // Set initial display values
-        display_update_battery(100);  // Start with 100% battery
-        display_update_motion_status("Initialized", false);
-        display_update_ip("0.0.0.0");  // Will be updated when WiFi connects
-    }
-    
-    start_wavego();
+    static const int k_servo_direction_defaults[16] = {
+        -1,  1,  1,  1,
+        1, -1, -1,  1,
+        -1,  1,  1,  1,
+        1, -1, -1,  1};
+    calibration_init();
+    // Apply middle positions from calibration to hardware
+    int id = 5;
+    static uint16_t d = 0;
+    static int16_t k = 1;
+    uint16_t mid = 0;
+    calibration_get_middle_pwm(id, &mid);
+    float angle = pwm_to_angle(mid);
+    uint16_t pwm = angle_to_pwm(angle);
+    ESP_LOGI(TAG, "mid pwm:%u  angle:%f", mid, angle);
+    // for(int i=0;i<180;i++){
+    //     pwm = angle_to_pwm(angle+k_servo_direction_defaults[id]*i);
+    //     pca9685_set_pwm_value(id, pwm);
+    //     ESP_LOGI(TAG, "angle:%f  pwm:%u", angle+k_servo_direction_defaults[id]*i, pwm);
+    //     vTaskDelay(10/portTICK_PERIOD_MS);
+    // }
+    // for(int i=180;i>0;i--){
+    //     pwm = angle_to_pwm(angle+k_servo_direction_defaults[id]*i);
+    //     pca9685_set_pwm_value(id, pwm);
+    //     ESP_LOGI(TAG, "angle:%f  pwm:%u", angle+k_servo_direction_defaults[id]*i, pwm);
+    //     vTaskDelay(10/portTICK_PERIOD_MS);
+    // }
+
+    // start_wavego();
+    start_wavego_task();
+    // send_wavego_command(WALK_HEIGHT, 50, STANDING);
     webServerInit();
-    
-    // xTaskCreate(atask, "abc", 1024*16, NULL, 3, NULL);
-    while(1){
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-    }
+
+
+    vTaskDelete(NULL);
+
 }
