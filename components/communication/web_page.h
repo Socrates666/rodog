@@ -190,45 +190,38 @@ static const char INDEX_HTML[] = R"rawliteral(
                         <td></td>
                     </tr>
                     <tr>
-                        <td colspan="3" align="center" style="padding-top:8px;">
-                            <label for="height-slider" style="margin-right:6px;">Height</label>
-                            <input id="height-slider" type="range" min="75" max="110" value="95" style="width:200px;">
-                            <span id="height-value">95</span>
-                        </td>
-                    </tr>
-                    <tr>
                     <br><br><br>
                     </tr>
                     <tr>
                         <td></td>
-                        <td align="center"><button class="button button2" id="forward" onmousedown="sendMove(1,50);" ontouchstart="sendMove(1,50);" onmouseup="sendMove(3,0);" ontouchend="sendMove(3,0);">FORWARD</button></td>
+                        <td align="center"><button class="button button2" id="forward" onmousedown="fetch(document.location.origin+'/control?var=move&val=1&cmd=0');" ontouchstart="fetch(document.location.origin+'/control?var=move&val=1&cmd=0');" onmouseup="fetch(document.location.origin+'/control?var=move&val=3&cmd=0');" ontouchend="fetch(document.location.origin+'/control?var=move&val=3&cmd=0');">FORWARD</button></td>
                         <td></td>
                     </tr>
                     <tr>
-                        <td align="center"><button class="button button2" id="turnleft" onmousedown="sendMove(2,40);" ontouchstart="sendMove(2,40);" onmouseup="sendMove(6,0);" ontouchend="sendMove(6,0);">LEFT</button></td>
-                        <td align="center"><button class="button button2" id="steady" onclick="sendFunc(1,0);">STEADY</button></td>
-                        <td align="center"><button class="button button2" id="turnright" onmousedown="sendMove(4,40);" ontouchstart="sendMove(4,40);" onmouseup="sendMove(6,0);" ontouchend="sendMove(6,0);">RIGHT</button></td>
+                        <td align="center"><button class="button button2" id="turnleft" onmousedown="fetch(document.location.origin+'/control?var=move&val=2&cmd=0');" ontouchstart="fetch(document.location.origin+'/control?var=move&val=2&cmd=0');" onmouseup="fetch(document.location.origin+'/control?var=move&val=6&cmd=0');" ontouchend="fetch(document.location.origin+'/control?var=move&val=6&cmd=0');">LEFT</button></td>
+                        <td align="center"><button class="button button2" id="steady" onclick="fetch(document.location.origin+'/control?var=funcMode&val=1&cmd=0');">STEADY</button></td>
+                        <td align="center"><button class="button button2" id="turnright" onmousedown="fetch(document.location.origin+'/control?var=move&val=4&cmd=0');" ontouchstart="fetch(document.location.origin+'/control?var=move&val=4&cmd=0');" onmouseup="fetch(document.location.origin+'/control?var=move&val=6&cmd=0');" ontouchend="fetch(document.location.origin+'/control?var=move&val=6&cmd=0');">RIGHT</button></td>
                     </tr>
                     <tr>
                         <td></td>
-                        <td align="center"><button class="button button2" id="backward" onmousedown="sendMove(5,50);" ontouchstart="sendMove(5,50);" onmouseup="sendMove(3,0);" ontouchend="sendMove(3,0);">REVERSE</button></td>
+                        <td align="center"><button class="button button2" id="backward" onmousedown="fetch(document.location.origin+'/control?var=move&val=5&cmd=0');" ontouchstart="fetch(document.location.origin+'/control?var=move&val=5&cmd=0');" onmouseup="fetch(document.location.origin+'/control?var=move&val=3&cmd=0');" ontouchend="fetch(document.location.origin+'/control?var=move&val=3&cmd=0');">REVERSE</button></td>
                         <td></td>
                     </tr>
                     <tr>
-                        <td align="center"><button class="button button4" id="stayLow" onclick="sendFunc(8,0);">Stand</button></td>
-                        <td align="center"><button class="button button4" id="handShake" onclick="sendFunc(1,40);">Wave</button></td>
-                        <td align="center"><button class="button button4" id="Jump" onclick="sendFunc(9,0);">Reset</button></td>
+                        <td align="center"><button class="button button4" id="stayLow" onclick="fetch(document.location.origin+'/control?var=funcMode&val=2&cmd=0');">StayLow</button></td>
+                        <td align="center"><button class="button button4" id="handShake" onclick="fetch(document.location.origin+'/control?var=funcMode&val=3&cmd=0');">HandShake</button></td>
+                        <td align="center"><button class="button button4" id="Jump" onclick="fetch(document.location.origin+'/control?var=funcMode&val=4&cmd=0');">Jump</button></td>
                     </tr>
                     <tr>epo:waveshare/WAVEGO 
-                        <td align="center"><button class="button button4" id="actionA" onclick="sendFunc(5,0);">ActionA</button></td>
-                        <td align="center"><button class="button button4" id="actionB" onclick="sendFunc(6,0);">ActionB</button></td>
-                        <td align="center"><button class="button button4" id="actionC" onclick="sendFunc(7,0);">ActionC</button></td>
+                        <td align="center"><button class="button button4" id="actionA" onclick="fetch(document.location.origin+'/control?var=funcMode&val=5&cmd=0');">ActionA</button></td>
+                        <td align="center"><button class="button button4" id="actionB" onclick="fetch(document.location.origin+'/control?var=funcMode&val=6&cmd=0');">ActionB</button></td>
+                        <td align="center"><button class="button button4" id="actionC" onclick="fetch(document.location.origin+'/control?var=funcMode&val=7&cmd=0');">ActionC</button></td>
                     </tr>
                     <tr><br><br><br></tr>
                     <tr>
-                        <td align="center"><button class="button button4" id="initPos" onclick="sendFunc(8,0);">InitPos</button></td>
+                        <td align="center"><button class="button button4" id="initPos" onclick="fetch(document.location.origin+'/control?var=funcMode&val=8&cmd=0');">InitPos</button></td>
                         <td align="center"></td>
-                        <td align="center"><button class="button button4" id="middlePos" onclick="sendFunc(9,0);">MiddlePos</button></td>
+                        <td align="center"><button class="button button4" id="middlePos" onclick="fetch(document.location.origin+'/control?var=funcMode&val=9&cmd=0');">MiddlePos</button></td>
                     </tr>
 
                     <tr>
@@ -336,24 +329,6 @@ static const char INDEX_HTML[] = R"rawliteral(
         var baseHost = document.location.origin
         var streamUrl = baseHost + ':81'
         const calibView = document.getElementById('calib-view')
-        const heightSlider = document.getElementById('height-slider')
-        const heightValue = document.getElementById('height-value')
-
-        const currentHeight = () => (heightSlider ? heightSlider.value : '95')
-        if (heightSlider && heightValue) {
-            heightValue.textContent = heightSlider.value
-            heightSlider.addEventListener('input', () => {
-                heightValue.textContent = heightSlider.value
-            })
-        }
-
-        const sendCmd = (varName, val, cmd) => {
-            const h = currentHeight()
-            return fetch(`${baseHost}/control?var=${varName}&val=${val}&cmd=${cmd}&height=${h}`)
-        }
-
-        const sendMove = (val, cmd) => sendCmd('move', val, cmd)
-        const sendFunc = (val, cmd) => sendCmd('funcMode', val, cmd)
 
         const hide = el => {
             el.classList.add('hidden')
@@ -412,8 +387,6 @@ static const char INDEX_HTML[] = R"rawliteral(
 
         window.refreshCalibration = refreshCalibration
         window.setPWM = setPWM
-        window.sendMove = sendMove
-        window.sendFunc = sendFunc
 
         refreshCalibration()
     });
