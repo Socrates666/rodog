@@ -171,7 +171,7 @@ esp_err_t ssd1306_init(const ssd1306_config_t *config, ssd1306_address_t address
     
     ret = ssd1306_write_command(SSD1306_SET_MUX_RATIO);
     if (ret != ESP_OK) return ret;
-    ret = ssd1306_write_command(0x3F); // Multiplex ratio (64MUX)
+    ret = ssd1306_write_command(0x1F); // Multiplex ratio (32MUX)
     if (ret != ESP_OK) return ret;
     
     ret = ssd1306_write_command(SSD1306_SET_DISP_OFFSET);
@@ -204,7 +204,7 @@ esp_err_t ssd1306_init(const ssd1306_config_t *config, ssd1306_address_t address
     ret = ssd1306_write_command(0x00); // Horizontal addressing mode
     if (ret != ESP_OK) return ret;
     
-    ret = ssd1306_write_command(SSD1306_SET_COM_OUT_DIR | 0x00); // COM pins configuration
+    ret = ssd1306_write_command(SSD1306_SET_COM_OUT_DIR | 0x08); // COM scan direction remapped
     if (ret != ESP_OK) return ret;
     
     ret = ssd1306_write_command(SSD1306_SET_SEG_REMAP | 0x01); // Remap columns
@@ -212,7 +212,7 @@ esp_err_t ssd1306_init(const ssd1306_config_t *config, ssd1306_address_t address
     
     ret = ssd1306_write_command(SSD1306_SET_COM_PIN_CFG);
     if (ret != ESP_OK) return ret;
-    ret = ssd1306_write_command(0x12); // COM pin configuration
+    ret = ssd1306_write_command(0x02); // COM pin configuration for 128x32
     if (ret != ESP_OK) return ret;
     
     ret = ssd1306_display_on();
@@ -432,11 +432,6 @@ esp_err_t ssd1306_print_char(uint8_t x, uint8_t y, char ch, bool color) {
                 ssd1306_draw_pixel(x + col, y + bit, color);
             }
         }
-    }
-    
-    // Add space between characters
-    for (uint8_t bit = 0; bit < 8; bit++) {
-        ssd1306_draw_pixel(x + 5, y + bit, !color);
     }
     
     return ESP_OK;

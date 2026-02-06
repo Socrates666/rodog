@@ -1,5 +1,6 @@
 #include "board.h"
 
+
 //==================================================================================
 // i2c
 //==================================================================================
@@ -114,8 +115,8 @@ esp_err_t bsp_pca9685_init(void){
     };
     i2c_master_dev_handle_t dev_handle;
     ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_handle, &dev_cfg, &dev_handle));
-    esp_err_t res = i2c_master_probe(i2c_handle, PCA9685_ADDR, 1000);
-    if(res == ESP_OK){
+     esp_err_t res = 0;//i2c_master_probe(i2c_handle, PCA9685_ADDR, 1000);
+    if(1){
         ESP_LOGI("PROBE", "Device found at 0x%02X", PCA9685_ADDR);
         pca9685_config_t pca_cfg={
             .dev_handle=dev_handle,
@@ -142,28 +143,117 @@ enum t_i2caddr{
 
 };
 
-esp_err_t bsp_ina219_init(uint16_t i){
+#define INA219_ADDR 0x42
+
+// Battery voltage limits for percentage calculation
+#define BSP_BATTERY_VOLT_MIN 6.0f
+#define BSP_BATTERY_VOLT_MAX 8.4f
+esp_err_t bsp_ina219_init(void){
 
     i2c_device_config_t dev_cfg = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-        .device_address = i,
+        .device_address = INA219_ADDR,
         .scl_speed_hz = 10000,
         .scl_wait_us = 1000,
     };
     i2c_master_dev_handle_t dev_handle;
     ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_handle, &dev_cfg, &dev_handle));
-    esp_err_t res = i2c_master_probe(i2c_handle, i, 1000);
+    esp_err_t res = i2c_master_probe(i2c_handle, INA219_ADDR, 1000);
     if(res == ESP_OK){
-        ESP_LOGI("PROBE", "Device found at 0x%02X", i);
+        ESP_LOGI("PROBE", "Device found at 0x%02X", INA219_ADDR);
+        ina219_config_t ina_cfg = {
+            .dev_handle = dev_handle,
+            .transmit_data_ina219 = i2c_master_transmit,
+            .receive_data_ina219 = i2c_master_receive,
+            .shunt_resistor = 0.01f,
+        };
+        res = ina219_init(&ina_cfg);
+        if (res != ESP_OK) {
+            ESP_LOGE("INA219", "Initialization failed: %d", res);
+            ESP_ERROR_CHECK(i2c_master_bus_rm_device(dev_handle));
+            return res;
+        }
+        return ESP_OK;
     }else{
-        // ESP_LOGE("PROBE", "Device found at 0x%02X failed", addr[i]);
+        ESP_LOGE("PROBE", "Device found at 0x%02X failed", INA219_ADDR);
         ESP_ERROR_CHECK(i2c_master_bus_rm_device(dev_handle));
+        return res;
     }
-     
-    // icm20948_cfg_t icm_cfg;
-    // icm_cfg.dev_handle=dev_handle;
-    // icm_cfg.transmit_data_icm20948=i2c_master_transmit;
-    // icm_cfg.receive_data_icm20948=i2c_master_receive;
-    // icm20948_init(&icm_cfg);
+}
+
+//==================================================================================
+// ina219
+//==================================================================================
+
+// Read battery percentage based on INA219 bus voltage
+esp_err_t bsp_read_battery_percent(uint8_t *percent){
+    if (!percent) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    float voltage = 0.0f;
+    esp_err_t res = ina219_read_bus_voltage(&voltage);
+    if (res != ESP_OK) {
+        return res;
+    }
+
+    float pct = (voltage - BSP_BATTERY_VOLT_MIN) / (BSP_BATTERY_VOLT_MAX - BSP_BATTERY_VOLT_MIN) * 100.0f;
+    if (pct < 0.0f) pct = 0.0f;
+    if (pct > 100.0f) pct = 100.0f;
+    *percent = (uint8_t)(pct + 0.5f);
     return ESP_OK;
+}
+
+//==================================================================================
+// ssd1306
+//==================================================================================
+
+#define SSD1306_ADDR 0x3C
+
+static i2c_master_dev_handle_t ssd1306_handle = NULL;
+static ssd1306_config_t ssd1306_cfg = {0};
+
+esp_err_t bsp_ssd1306_init(void){
+    if (ssd1306_handle != NULL) {
+        return ESP_OK;
+    }
+
+    i2c_device_config_t dev_cfg = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = SSD1306_ADDR,
+        .scl_speed_hz = 400000,
+    };
+
+    ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_handle, &dev_cfg, &ssd1306_handle));
+    ssd1306_cfg.dev_handle = ssd1306_handle;
+    ssd1306_cfg.transmit_data_ssd1306 = i2c_master_transmit;
+    ssd1306_cfg.receive_data_ssd1306 = i2c_master_receive;
+
+    esp_err_t res = ssd1306_init(&ssd1306_cfg, SSD1306_ADDR_0X3C);
+    if (res != ESP_OK) {
+        ESP_LOGE("SSD1306", "Initialization failed: %d", res);
+        ESP_ERROR_CHECK(i2c_master_bus_rm_device(ssd1306_handle));
+        ssd1306_handle = NULL;
+    }
+    return res;
+}
+
+// Clear OLED display
+esp_err_t bsp_ssd1306_clear(void){
+    return ssd1306_clear_screen();
+}
+
+// Fill a rectangle on OLED
+esp_err_t bsp_ssd1306_fill_rect(uint8_t x, uint8_t y, uint8_t width, uint8_t height, bool color){
+    return ssd1306_fill_rect(x, y, width, height, color);
+}
+
+// Print string on OLED
+esp_err_t bsp_ssd1306_print_string(uint8_t x, uint8_t y, const char* str, bool color){
+    return ssd1306_print_string(x, y, str, color);
+}
+
+// Update OLED screen
+esp_err_t bsp_ssd1306_update_screen(void){
+    return ssd1306_update_screen();
 }

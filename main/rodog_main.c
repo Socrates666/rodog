@@ -24,6 +24,7 @@
 #include "micro_ros_uart.h"
 #include "calibration.h"
 #include "pca9685.h"
+#include "display.h"
 
 static const char* TAG = "MAIN";
 
@@ -77,21 +78,13 @@ void app_main(void)
     if(ret != ESP_OK){
         ESP_LOGE(TAG, "PCA9685初始化失败");
     }
-    static const int k_servo_direction_defaults[16] = {
-        -1,  1,  1,  1,
-        1, -1, -1,  1,
-        -1,  1,  1,  1,
-        1, -1, -1,  1};
+    ret = bsp_ina219_init();
+    if(ret != ESP_OK){
+        ESP_LOGE(TAG, "INA219初始化失败");
+    }
+    display_init();
     calibration_init();
-    // Apply middle positions from calibration to hardware
-    int id = 5;
-    static uint16_t d = 0;
-    static int16_t k = 1;
-    uint16_t mid = 0;
-    calibration_get_middle_pwm(id, &mid);
-    float angle = pwm_to_angle(mid);
-    uint16_t pwm = angle_to_pwm(angle);
-    ESP_LOGI(TAG, "mid pwm:%u  angle:%f", mid, angle);
+    // Apply middle positions from calibration to hardwar
     // for(int i=0;i<180;i++){
     //     pwm = angle_to_pwm(angle+k_servo_direction_defaults[id]*i);
     //     pca9685_set_pwm_value(id, pwm);
@@ -105,9 +98,15 @@ void app_main(void)
     //     vTaskDelay(10/portTICK_PERIOD_MS);
     // }
 
-    // start_wavego();
     start_wavego_task();
-    // send_wavego_command(WALK_HEIGHT, 50, STANDING);
+    // start_wavego_task();
+    // send_wavego_command(WALK_HEIGHT_ANGLE, 50, STANDING);
+    // vTaskDelay(5000 / portTICK_PERIOD_MS);
+    // send_wavego_command(WALK_HEIGHT_ANGLE, 50, WALKING_FORWARD);
+    // vTaskDelay(5000 / portTICK_PERIOD_MS);
+    send_wavego_command(WALK_HEIGHT_ANGLE, 50, WALKING_BACKWARD);
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+    send_wavego_command(WALK_HEIGHT_ANGLE, 50, STANDING);
     webServerInit();
 
 

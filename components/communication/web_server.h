@@ -6,9 +6,10 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
 #include "esp_netif.h"
-#include "components/control/leg.h"
-
+#include "board.h"
 // WiFi 配置
 #define DEFAULT_WIFI_MODE 1
 
@@ -16,15 +17,10 @@ extern "C" {
 
 // 函数声明
 void getMAC(void);
-void getIP(void);
+bool getIP(char *out, size_t out_len);
 void getWifiStatus(void);
 void wifiInit(void);
 void webServerInit(void);
-
-// 从其他模块导入的函数
-// void servoConfigSave(uint8_t activeServo);
-void init_pos_all(void);
-void middle_pos_all(void);
 
 #ifdef __cplusplus
 }

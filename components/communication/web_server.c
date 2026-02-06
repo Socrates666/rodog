@@ -22,15 +22,63 @@
 #include "esp_mac.h"
 #include "web_server.h"
 #include "web_page.h"
+#include "calibration.h"
+#include "pca9685.h"
 #include "leg.h"
 
 static const char *TAG = "WEBSERVER";
+static bool s_wavego_started = false;
 
 // 本地控制状态，仅供 Web 命令记录使用
 static uint8_t s_debug_mode = 0;
 static uint8_t s_func_mode = 0;
 static int s_move_fb = 0;
 static int s_move_lr = 0;
+
+static void reset_all_servos_to_middle(void) {
+    for (int i = 0; i < 16; i++) {
+        uint16_t mid = 0;
+        calibration_get_middle_pwm((uint8_t)i, &mid);
+        pca9685_set_pwm_value((uint8_t)i, mid);
+        vTaskDelay(pdMS_TO_TICKS(SERVO_MOVE_EVERY));
+    }
+}
+
+static uint16_t counts_for_angle(double deg) {
+    const float min_us = 500.0f;
+    const float max_us = 2500.0f;
+    if (deg < 0.0) deg = 0.0;
+    if (deg > 180.0) deg = 180.0;
+    float pulse_us = min_us + (float)(deg / 180.0) * (max_us - min_us);
+    float counts = pulse_us * (float)CONFIG_CONTROL_SERVO_FREQ_HZ * 4096.0f / 1000000.0f;
+    if (counts < 0) counts = 0;
+    if (counts > 4095) counts = 4095;
+    return (uint16_t)lroundf(counts);
+}
+
+static void apply_middle_offset_deg(double offset_deg) {
+    uint16_t step = counts_for_angle(90.0 + offset_deg) - counts_for_angle(90.0);
+    for (int i = 0; i < 16; i++) {
+        uint16_t mid = 0;
+        calibration_get_middle_pwm((uint8_t)i, &mid);
+        int32_t target = (int32_t)mid + (int32_t)step;
+        if (target < 0) target = 0;
+        if (target > 4095) target = 4095;
+        pca9685_set_pwm_value((uint8_t)i, (uint16_t)target);
+        vTaskDelay(pdMS_TO_TICKS(SERVO_MOVE_EVERY));
+    }
+}
+
+static void ensure_wavego_started(void) {
+    if (!s_wavego_started) {
+        if (start_wavego_task() == ESP_OK) {
+            s_wavego_started = true;
+            ESP_LOGI(TAG, "Wavego task started from web");
+        } else {
+            ESP_LOGE(TAG, "Failed to start wavego task");
+        }
+    }
+}
 
 // WiFi 配置
 const char* AP_SSID = "WAVESHARE Robot";
@@ -103,15 +151,30 @@ void getMAC(void) {
 }
 
 // 获取 IP 地址
-void getIP(void) {
-    esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-    if (netif) {
-        esp_netif_ip_info_t ip_info;
-        if (esp_netif_get_ip_info(netif, &ip_info) == ESP_OK) {
-            IP_ADDRESS = ip_info.ip;
-            ESP_LOGI(TAG, "STA IP: " IPSTR, IP2STR(&IP_ADDRESS));
-        }
+bool getIP(char *out, size_t out_len) {
+    if (!out || out_len == 0) {
+        return false;
     }
+
+    esp_netif_ip_info_t ip_info;
+    esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (netif && esp_netif_get_ip_info(netif, &ip_info) == ESP_OK) {
+        IP_ADDRESS = ip_info.ip;
+        snprintf(out, out_len, IPSTR, IP2STR(&IP_ADDRESS));
+        ESP_LOGI(TAG, "STA IP: " IPSTR, IP2STR(&IP_ADDRESS));
+        return true;
+    }
+
+    netif = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+    if (netif && esp_netif_get_ip_info(netif, &ip_info) == ESP_OK) {
+        IP_ADDRESS = ip_info.ip;
+        snprintf(out, out_len, IPSTR, IP2STR(&IP_ADDRESS));
+        // ESP_LOGI(TAG, "AP IP: " IPSTR, IP2STR(&IP_ADDRESS));
+        return true;
+    }
+
+    snprintf(out, out_len, "0.0.0.0");
+    return false;
 }
 
 // 获取 WiFi 状态
@@ -260,6 +323,7 @@ static esp_err_t cmd_handler(httpd_req_t *req) {
     char variable[32] = {0};
     char value[32] = {0};
     char cmd[32] = {0};
+    char height[32] = {0};
     
     buf_len = httpd_req_get_url_query_len(req) + 1;
     if (buf_len > 1) {
@@ -273,7 +337,8 @@ static esp_err_t cmd_handler(httpd_req_t *req) {
             if (httpd_query_key_value(buf, "var", variable, sizeof(variable)) == ESP_OK &&
                 httpd_query_key_value(buf, "val", value, sizeof(value)) == ESP_OK &&
                 httpd_query_key_value(buf, "cmd", cmd, sizeof(cmd)) == ESP_OK) {
-                // 参数解析成功
+                // 参数解析成功，height 为可选参数
+                httpd_query_key_value(buf, "height", height, sizeof(height));
             } else {
                 free(buf);
                 httpd_resp_send_404(req);
@@ -292,6 +357,9 @@ static esp_err_t cmd_handler(httpd_req_t *req) {
     
     int val = atoi(value);
     int cmdint = atoi(cmd);
+    int height_int = height[0] ? atoi(height) : WALK_HEIGHT_ANGLE;
+    if (height_int < WALK_HEIGHT_MIN_ANGLE) height_int = WALK_HEIGHT_MIN_ANGLE;
+    if (height_int > WALK_HEIGHT_MAX_ANGLE) height_int = WALK_HEIGHT_MAX_ANGLE;
     int res = 0;
     
     // 根据 URL 中的参数确定功能
@@ -304,25 +372,34 @@ static esp_err_t cmd_handler(httpd_req_t *req) {
     // 功能控制
     if (!strcmp(variable, "funcMode")) {
         s_debug_mode = 0;
+        s_func_mode = val;
+        ensure_wavego_started();
+
+        int wave_height = 30;
+        int wave_speed = (cmdint > 0) ? cmdint : 50;
+
         if (val == 1) {
-            if (s_func_mode == 1) {
-                s_func_mode = 0;
-                ESP_LOGI(TAG, "Steady OFF");
-            } else if (s_func_mode == 0) {
-                s_func_mode = 1;
-                ESP_LOGI(TAG, "Steady ON");
-            }
+            send_wavego_command(wave_height, wave_speed, WAVING);
+            ESP_LOGI(TAG, "Mode: Waving (speed=%d)", wave_speed);
+        } else if (val == 8) { // InitPos
+            // reset_all_servos_to_middle();
+            send_wavego_command(wave_height, wave_speed, STANDING);
+            ESP_LOGI(TAG, "Mode: InitPos -> Stand");
+        } else if (val == 9) { // MiddlePos
+            // apply_middle_offset_deg(45.0);
+            send_wavego_command(wave_height, wave_speed, STANDING);
+            ESP_LOGI(TAG, "Mode: MiddlePos (+45deg) -> Stand");
         } else {
-            s_func_mode = val;
-            ESP_LOGI(TAG, "funcMode: %d", val);
+            ESP_LOGI(TAG, "Func mode %d not mapped to action", val);
         }
     }
     // 伺服调试模式
     else if (!strcmp(variable, "sset")) {
-        servo_set_default_pwm(val, leg_get_current_pwm(val));
-        esp_err_t save_err = servo_config_save_to_nvs();
+        uint16_t current = 0;
+        pca9685_get_pwm_value((uint8_t)val, &current);
+        esp_err_t save_err = calibration_set_middle_pwm((uint8_t)val, current);
         if (save_err == ESP_OK) {
-            ESP_LOGI(TAG, "Saved servo %d calibration: %d", val, leg_get_servo_middle_pwm(val));
+            ESP_LOGI(TAG, "Saved servo %d calibration: %u", val, current);
         } else {
             ESP_LOGE(TAG, "Failed to save servo %d calibration: %s", val, esp_err_to_name(save_err));
             res = -1;
@@ -330,26 +407,26 @@ static esp_err_t cmd_handler(httpd_req_t *req) {
     } else if (!strcmp(variable, "ssetval")) {
         s_debug_mode = 1;
         s_func_mode = 0;
-        int clamped = leg_clamp_servo_pwm(val, cmdint);
-        if (leg_set_servo_pwm(val, clamped) == ESP_OK) {
-            ESP_LOGI(TAG, "Set servo %d to %d (clamped)", val, clamped);
+        uint16_t target = (uint16_t)cmdint;
+        if (pca9685_set_pwm_value((uint8_t)val, target) == ESP_OK) {
+            ESP_LOGI(TAG, "Set servo %d to %u", val, target);
         } else {
             ESP_LOGE(TAG, "Failed to set servo %d", val);
             res = -1;
         }
     } else if (!strcmp(variable, "sload")) {
-        esp_err_t load_err = servo_config_load_from_nvs();
+        esp_err_t load_err = calibration_load_from_nvs();
         if (load_err == ESP_OK) {
-            middle_pos_all();
+            reset_all_servos_to_middle();
             ESP_LOGI(TAG, "Reloaded servo calibration from NVS");
         } else {
             ESP_LOGE(TAG, "Failed to reload calibration: %s", esp_err_to_name(load_err));
             res = -1;
         }
     } else if (!strcmp(variable, "sreset")) {
-        esp_err_t reset_err = servo_config_reset_defaults();
+        esp_err_t reset_err = calibration_reset_defaults();
         if (reset_err == ESP_OK) {
-            middle_pos_all();
+            reset_all_servos_to_middle();
             ESP_LOGI(TAG, "Servo calibration reset to defaults");
         } else {
             ESP_LOGE(TAG, "Failed to reset calibration: %s", esp_err_to_name(reset_err));
@@ -360,24 +437,42 @@ static esp_err_t cmd_handler(httpd_req_t *req) {
     else if (!strcmp(variable, "move")) {
         s_debug_mode = 0;
         s_func_mode = 0;
-        if (val == 1) {
-            ESP_LOGI(TAG, "Forward");
-            s_move_fb = 1;
-        } else if (val == 2) {
-            ESP_LOGI(TAG, "TurnLeft");
-            s_move_lr = -1;
-        } else if (val == 3) {
-            ESP_LOGI(TAG, "FBStop");
-            s_move_fb = 0;
-        } else if (val == 4) {
-            ESP_LOGI(TAG, "TurnRight");
-            s_move_lr = 1;
-        } else if (val == 5) {
-            ESP_LOGI(TAG, "Backward");
-            s_move_fb = -1;
-        } else if (val == 6) {
-            ESP_LOGI(TAG, "LRStop");
-            s_move_lr = 0;
+        ensure_wavego_started();
+
+        int wave_height = height_int;
+        int wave_speed = (cmdint > 0) ? cmdint : 50;
+        ActionState target = STANDING;
+
+        switch (val) {
+            case 1: // forward
+                target = WALKING_FORWARD;
+                ESP_LOGI(TAG, "Walk Forward (speed=%d)", wave_speed);
+                break;
+            case 5: // backward
+                target = WALKING_BACKWARD;
+                ESP_LOGI(TAG, "Walk Backward (speed=%d)", wave_speed);
+                break;
+            case 2:
+                target = TURNING_LEFT;
+                ESP_LOGI(TAG, "Turn Left (speed=%d)", wave_speed);
+                break;
+            case 4:
+                target = TURNING_RIGHT;
+                ESP_LOGI(TAG, "Turn Right (speed=%d)", wave_speed);
+                break;
+            case 3:
+            case 6:
+                target = STANDING;
+                ESP_LOGI(TAG, "Stop/Stand");
+                break;
+            default:
+                ESP_LOGW(TAG, "Unknown move val=%d", val);
+                res = -1;
+                break;
+        }
+
+        if (!res) {
+            send_wavego_command(wave_height, wave_speed, target);
         }
     } else {
         ESP_LOGW(TAG, "Unknown variable: %s", variable);
@@ -401,14 +496,13 @@ static esp_err_t index_handler(httpd_req_t *req) {
 static esp_err_t servo_config_handler(httpd_req_t *req) {
     char resp[512];
     int len = 0;
-    int middle[16] = {0};
+    uint16_t middle[16] = {0};
     int direction[16] = {0};
-    
-    leg_get_servo_snapshot(middle, direction);
 
     len += snprintf(resp + len, sizeof(resp) - len, "{\"middle\":[");
     for (int i = 0; i < 16 && len < (int)sizeof(resp); i++) {
-        len += snprintf(resp + len, sizeof(resp) - len, "%d%s", middle[i], (i == 15) ? "" : ",");
+        calibration_get_middle_pwm((uint8_t)i, &middle[i]);
+        len += snprintf(resp + len, sizeof(resp) - len, "%u%s", middle[i], (i == 15) ? "" : ",");
     }
     len += snprintf(resp + len, sizeof(resp) - len, "],\"direction\":[");
     for (int i = 0; i < 16 && len < (int)sizeof(resp); i++) {

@@ -36,11 +36,11 @@ extern "C" {
 
 // Display dimensions
 #define SSD1306_WIDTH                           128
-#define SSD1306_HEIGHT                          64
+#define SSD1306_HEIGHT                          32
 #define SSD1306_PAGES                           (SSD1306_HEIGHT / 8)
 
 // Font definitions
-#define FONT_WIDTH                              6
+#define FONT_WIDTH                              5
 #define FONT_HEIGHT                             8
 
 typedef struct {
