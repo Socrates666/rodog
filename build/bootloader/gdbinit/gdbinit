@@ -1,0 +1,2 @@
+source /home/coder/.openclaw/workspace/projects/rodog/build/bootloader/gdbinit/symbols
+source /home/coder/.openclaw/workspace/projects/rodog/build/bootloader/gdbinit/connect

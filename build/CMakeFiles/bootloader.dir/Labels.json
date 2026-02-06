@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/coder/.openclaw/workspace/projects/rodog/build/CMakeFiles/bootloader"
+		},
+		{
+			"file" : "/home/coder/.openclaw/workspace/projects/rodog/build/CMakeFiles/bootloader.rule"
+		},
+		{
+			"file" : "/home/coder/.openclaw/workspace/projects/rodog/build/CMakeFiles/bootloader-complete.rule"
+		},
+		{
+			"file" : "/home/coder/.openclaw/workspace/projects/rodog/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule"
+		},
+		{
+			"file" : "/home/coder/.openclaw/workspace/projects/rodog/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule"
+		},
+		{
+			"file" : "/home/coder/.openclaw/workspace/projects/rodog/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule"
+		},
+		{
+			"file" : "/home/coder/.openclaw/workspace/projects/rodog/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule"
+		},
+		{
+			"file" : "/home/coder/.openclaw/workspace/projects/rodog/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule"
+		},
+		{
+			"file" : "/home/coder/.openclaw/workspace/projects/rodog/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule"
+		},
+		{
+			"file" : "/home/coder/.openclaw/workspace/projects/rodog/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"bootloader"
+		],
+		"name" : "bootloader"
+	}
+}
