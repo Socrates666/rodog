@@ -104,9 +104,9 @@ void app_main(void)
     // vTaskDelay(5000 / portTICK_PERIOD_MS);
     // send_wavego_command(WALK_HEIGHT_ANGLE, 50, WALKING_FORWARD);
     // vTaskDelay(5000 / portTICK_PERIOD_MS);
-    send_wavego_command(WALK_HEIGHT_ANGLE, 50, WALKING_BACKWARD);
-    vTaskDelay(5000 / portTICK_PERIOD_MS);
-    send_wavego_command(WALK_HEIGHT_ANGLE, 50, STANDING);
+    // send_wavego_command(WALK_HEIGHT_ANGLE, 50, WALKING_BACKWARD);
+    // vTaskDelay(5000 / portTICK_PERIOD_MS);
+    send_wavego_command(0, 50, INITIALIZING);
     webServerInit();
 
 

@@ -192,8 +192,8 @@ static const char INDEX_HTML[] = R"rawliteral(
                     <tr>
                         <td colspan="3" align="center" style="padding-top:8px;">
                             <label for="height-slider" style="margin-right:6px;">Height</label>
-                            <input id="height-slider" type="range" min="75" max="110" value="95" style="width:200px;">
-                            <span id="height-value">95</span>
+                            <input id="height-slider" type="range" min="10" max="60" value="30" style="width:200px;">
+                            <span id="height-value">30</span>
                         </td>
                     </tr>
                     <tr>
@@ -215,7 +215,7 @@ static const char INDEX_HTML[] = R"rawliteral(
                         <td></td>
                     </tr>
                     <tr>
-                        <td align="center"><button class="button button4" id="stayLow" onclick="sendFunc(8,0);">Stand</button></td>
+                        <td align="center"><button class="button button4" id="stayLow" onclick="sendFunc(9,0);">Stand</button></td>
                         <td align="center"><button class="button button4" id="handShake" onclick="sendFunc(1,40);">Wave</button></td>
                         <td align="center"><button class="button button4" id="Jump" onclick="sendFunc(9,0);">Reset</button></td>
                     </tr>

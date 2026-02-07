@@ -383,9 +383,9 @@ static esp_err_t cmd_handler(httpd_req_t *req) {
             ESP_LOGI(TAG, "Mode: Waving (speed=%d)", wave_speed);
         } else if (val == 8) { // InitPos
             // reset_all_servos_to_middle();
-            send_wavego_command(wave_height, wave_speed, STANDING);
+            send_wavego_command(wave_height, wave_speed, INITIALIZING);
             ESP_LOGI(TAG, "Mode: InitPos -> Stand");
-        } else if (val == 9) { // MiddlePos
+        } else if (val == 9) { // StandPos
             // apply_middle_offset_deg(45.0);
             send_wavego_command(wave_height, wave_speed, STANDING);
             ESP_LOGI(TAG, "Mode: MiddlePos (+45deg) -> Stand");

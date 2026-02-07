@@ -43,13 +43,14 @@ static const leg_servo_map_t s_leg_map[4] = {
 static uint16_t s_servo_base_pwm[16] = {0};
 static bool s_servo_base_ready = false;
 static float s_servo_stand_angle[16] = {0};
+static float s_servo_current_angle[16] = {0};
 
 static TaskHandle_t s_wavego_task_handle = NULL;
 static QueueHandle_t s_wavego_cmd_queue = NULL;
 static wavego_command_t s_active_cmd = {
-    .wave_height = WALK_HEIGHT_ANGLE,
-    .wave_speed = 50,
-    .state = STANDING,
+    .wave_height = INIT_HEIGHT_ANGLE,
+    .wave_speed = -1,
+    .state = INITIALIZING,
 };
 
 // 前置加载舵机初始pwm至s_servo_base_pwm
@@ -58,6 +59,7 @@ static void load_servo_bases(void) {
         uint16_t mid = 0;
         calibration_get_middle_pwm(i, &mid);
         s_servo_base_pwm[i] = mid;
+        s_servo_current_angle[i] = 0.0f;
 #if WAVEGO_PWM_DEBUG
         ESP_LOGI(TAG, "Base servo %u mid %u angle %.1f", (unsigned)i, (unsigned)mid, pwm_to_angle(mid));
 #endif
@@ -101,16 +103,14 @@ static void drive_servo_to_angle(uint8_t id, float angle){
     }
     pwm = angle_to_pwm(target_angle);
     pca9685_set_pwm_value(id, pwm);
+    s_servo_current_angle[id] = angle;
 }
 // 应用站立姿态
 static void apply_stand_pose(const wavego_command_t *cmd) {
     float height_angle = (float)(cmd->wave_height);
     control_leg_height(height_angle);
-    for (int leg_idx = 0; leg_idx < 4; leg_idx++) {
-        leg_servo_map_t leg = s_leg_map[leg_idx];
-        drive_servo_to_angle(leg.fore, 0.0f);
-        drive_servo_to_angle(leg.back, 0.0f);
-        drive_servo_to_angle(leg.wave, 0.0f);
+    for (int servo_idx = 0; servo_idx < 16; servo_idx++) {
+        drive_servo_to_angle(servo_idx, 0.0f);
     }
 }
 // 应用行走姿态
@@ -123,30 +123,122 @@ static void apply_walk_pose(const wavego_command_t *cmd, float phase, int direct
         float fore_back_offset = cosf(leg_phase);
 
         // Leg lift
-        float lift_angle = 0.0f;
-        if (lift > 0.0f) {
-            lift_angle = lift * 30.0f; // Max lift angle
-        }
-        // drive_servo_to_angle(leg.wave, lift_angle);
+        // float lift_angle = 0.0f;
+        // if (lift > 0.0f) {
+        //     lift_angle = lift * 30.0f; // Max lift angle
+        // }
+        drive_servo_to_angle(leg.wave, DEBUG_HEIGHT_ANGLE);
 
         // Fore/back swing
         float swing_angle = fore_back_offset * 20.0f; // Max swing angle
         drive_servo_to_angle(leg.fore, swing_angle);
         drive_servo_to_angle(leg.back, -swing_angle);
     }
+    ESP_LOGI(TAG, "Applied walk pose with height %d, phase %.2f", cmd->wave_height, phase);
+}
+static void apply_turn_pose(const wavego_command_t *cmd, float phase, int direction) {
+    control_leg_height((float)(cmd->wave_height));
+    for (int leg_idx = 0; leg_idx < 4; leg_idx++) {
+        leg_servo_map_t leg = s_leg_map[leg_idx];
+        float leg_phase = phase + (float)(M_PI_2 * leg_idx * direction);
+        float lift = sinf(leg_phase);
+        float side_offset = cosf(leg_phase);
+
+        // Leg lift
+        float lift_angle = 0.0f;
+        if (lift > 0.0f) {
+            lift_angle = lift * 30.0f; // Max lift angle
+        }
+        drive_servo_to_angle(leg.wave, lift_angle);
+
+        // Side swing
+        float swing_angle = side_offset * 15.0f; // Max side swing angle
+        drive_servo_to_angle(leg.fore, swing_angle);
+        drive_servo_to_angle(leg.back, swing_angle);
+    }
+    ESP_LOGI(TAG, "Applied turn pose with height %d, phase %.2f", cmd->wave_height, phase);
 }
 
+static void apply_debug_pose(const wavego_command_t *cmd) {
+    control_leg_height((float)(DEBUG_HEIGHT_ANGLE));
+    for (int leg_idx = 0; leg_idx < 4; leg_idx++) {
+        drive_servo_to_angle(s_leg_map[leg_idx].wave, 0.0f);
+        drive_servo_to_angle(s_leg_map[leg_idx].fore, 0.0f);
+        drive_servo_to_angle(s_leg_map[leg_idx].back, 0.0f);
+    }
+}
+static void apply_init_pose(const wavego_command_t *cmd) {
+    control_leg_height((float)(INIT_HEIGHT_ANGLE));
+    for (int leg_idx = 0; leg_idx < 4; leg_idx++) {
+        drive_servo_to_angle(s_leg_map[leg_idx].wave, 90.0f);
+        drive_servo_to_angle(s_leg_map[leg_idx].fore, 0);
+        drive_servo_to_angle(s_leg_map[leg_idx].back, 0);
+    }
+}
+
+static void build_target_angles(ActionState state, const wavego_command_t *cmd, float target[16]) {
+    for (int i = 0; i < 16; i++) {
+        target[i] = 0.0f;
+    }
+
+    if (state == STANDING) {
+        control_leg_height((float)(cmd->wave_height));
+        return;
+    }
+
+    if (state == DEBUG) {
+        control_leg_height((float)(DEBUG_HEIGHT_ANGLE));
+        return;
+    }
+
+    if (state == INITIALIZING) {
+        control_leg_height((float)(INIT_HEIGHT_ANGLE));
+        for (int leg_idx = 0; leg_idx < 4; leg_idx++) {
+            target[s_leg_map[leg_idx].wave] = 90.0f;
+        }
+    }
+}
+
+static void smooth_move_to_pose(ActionState state, const wavego_command_t *cmd, TickType_t total_period) {
+    float target[16];
+    build_target_angles(state, cmd, target);
+
+    const int steps = 10;
+    TickType_t step_delay = pdMS_TO_TICKS(1);
+    if (total_period > 0) {
+        step_delay = total_period / steps;
+        if (step_delay == 0) {
+            step_delay = pdMS_TO_TICKS(1);
+        }
+    }
+
+    for (int step = 1; step <= steps; step++) {
+        float t = (float)step / (float)steps;
+        for (int i = 0; i < 16; i++) {
+            float angle = s_servo_current_angle[i] + (target[i] - s_servo_current_angle[i]) * t;
+            drive_servo_to_angle(i, angle);
+        }
+        vTaskDelay(step_delay);
+    }
+}
 
 static void wavego_task(void *pvParameters) {
     ESP_LOGI(TAG, "wavego task started (100 Hz)");
     TickType_t last_wake = xTaskGetTickCount();
-    TickType_t period = pdMS_TO_TICKS(10);
+    const static TickType_t period = pdMS_TO_TICKS(10);
     float phase = 0.0f;
+    ActionState last_state = s_active_cmd.state;
 
     while (1) {
-        wavego_command_t incoming;
-        while (xQueueReceive(s_wavego_cmd_queue, &incoming, 0) == pdPASS) {
+        static wavego_command_t incoming;
+        static TickType_t changeable_period = pdMS_TO_TICKS(500);
+        while(xQueueReceive(s_wavego_cmd_queue, &incoming, 0) == pdPASS) {
             s_active_cmd = incoming;
+            if(s_active_cmd.state > STANDING){
+                changeable_period = period;   
+            }else{
+                changeable_period = pdMS_TO_TICKS(500);
+            }
         }
 
         float freq_hz = ((float)s_active_cmd.wave_speed / 50.0f);
@@ -154,10 +246,27 @@ static void wavego_task(void *pvParameters) {
         if (phase > (float)(2.0f * M_PI)) {
             phase -= (float)(2.0f * M_PI);
         }
-        period = pdMS_TO_TICKS((s_active_cmd.wave_speed));
         switch (s_active_cmd.state) {
+            case DEBUG:
+                if (last_state != s_active_cmd.state) {
+                    smooth_move_to_pose(s_active_cmd.state, &s_active_cmd, changeable_period);
+                } else {
+                    apply_debug_pose(&s_active_cmd);
+                }
+                break;
+            case INITIALIZING:
+                if (last_state != s_active_cmd.state) {
+                    smooth_move_to_pose(s_active_cmd.state, &s_active_cmd, changeable_period);
+                } else {
+                    apply_init_pose(&s_active_cmd);
+                }
+                break;
             case STANDING:
-                apply_stand_pose(&s_active_cmd);
+                if (last_state != s_active_cmd.state) {
+                    smooth_move_to_pose(s_active_cmd.state, &s_active_cmd, changeable_period);
+                } else {
+                    apply_stand_pose(&s_active_cmd);
+                }
                 break;
             case WAVING:
                 // apply_wave_pose(&s_active_cmd, phase);
@@ -169,17 +278,19 @@ static void wavego_task(void *pvParameters) {
                 apply_walk_pose(&s_active_cmd, phase, -1);
                 break;
             case TURNING_LEFT:
-                // apply_turn_pose(&s_active_cmd, phase, -1);
+                apply_turn_pose(&s_active_cmd, phase, -1);
                 break;
             case TURNING_RIGHT:
-                // apply_turn_pose(&s_active_cmd, phase, 1);
+                apply_turn_pose(&s_active_cmd, phase, 1);
                 break;
             default:
                 apply_stand_pose(&s_active_cmd);
                 break;
         }
 
-        vTaskDelayUntil(&last_wake, period);
+        last_state = s_active_cmd.state;
+        ESP_LOGI(TAG, "State: %d, Height: %d, Speed: %d", s_active_cmd.state, s_active_cmd.wave_height, s_active_cmd.wave_speed);
+        vTaskDelayUntil(&last_wake, changeable_period);
     }
 }
 
@@ -196,7 +307,7 @@ esp_err_t start_wavego_task(void) {
     }
 
     load_servo_bases();
-    BaseType_t created = xTaskCreate(wavego_task, "wavego", 4096, NULL, 5, &s_wavego_task_handle);
+    BaseType_t created = xTaskCreate(wavego_task, "wavego", 4096, NULL, 11, &s_wavego_task_handle);
     if (created != pdPASS) {
         s_wavego_task_handle = NULL;
         vQueueDelete(s_wavego_cmd_queue);
@@ -212,7 +323,7 @@ esp_err_t start_wavego_task(void) {
     // for(int i = 0; i< 16;i++){
     //     drive_servo_to_angle(i, 30);
     // }
-    send_wavego_command(WALK_HEIGHT_ANGLE, 50, STANDING);
+    send_wavego_command(s_active_cmd.wave_height, s_active_cmd.wave_speed, INITIALIZING);
     return ESP_OK;
 }
 

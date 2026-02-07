@@ -42,6 +42,9 @@ extern "C" {
 #define LINKAGE_D 31.7750
 #define LINKAGE_E 30.8076
 
+//初始化参数
+#define INIT_HEIGHT_ANGLE  45.0
+#define DEBUG_HEIGHT_ANGLE    0.0
 // 步行参数
 #define WALK_HEIGHT_MAX_ANGLE  55
 #define WALK_HEIGHT_MIN_ANGLE  5
@@ -60,9 +63,11 @@ extern "C" {
 #define MAX_TEST 125
 
 typedef enum {
+	DEBUG,
+	INITIALIZING, 
+	STANDING,
 	WALKING_FORWARD,
 	WALKING_BACKWARD,
-	STANDING,
 	WAVING,
 	TURNING_LEFT,
 	TURNING_RIGHT,
