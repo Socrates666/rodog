@@ -62,6 +62,9 @@ extern "C" {
 #define SERVO_MOVE_EVERY 4
 #define MAX_TEST 125
 
+#define LEG_ICM_READ_HZ 200
+#define LEG_ICM_QUEUE_LEN 10
+
 typedef enum {
 	DEBUG,
 	INITIALIZING, 
@@ -77,6 +80,7 @@ esp_err_t start_wavego_task(void);
 esp_err_t stop_wavego_task(void);
 esp_err_t send_wavego_command(int wave_height, int wave_speed, ActionState state);
 ActionState get_current_action_state(void);
+
 #ifdef __cplusplus
 }
 #endif

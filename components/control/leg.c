@@ -2,6 +2,7 @@
 #include <stdbool.h>
 
 #include "leg.h"
+#include "board.h"
 #include "calibration.h"
 #include "pca9685.h"
 
@@ -307,6 +308,9 @@ esp_err_t start_wavego_task(void) {
     }
 
     load_servo_bases();
+    bsp_icm20948_set_rate(LEG_ICM_READ_HZ);
+
+
     BaseType_t created = xTaskCreate(wavego_task, "wavego", 4096, NULL, 11, &s_wavego_task_handle);
     if (created != pdPASS) {
         s_wavego_task_handle = NULL;
@@ -333,10 +337,14 @@ esp_err_t stop_wavego_task(void) {
         s_wavego_task_handle = NULL;
     }
 
+
+
     if (s_wavego_cmd_queue) {
         vQueueDelete(s_wavego_cmd_queue);
         s_wavego_cmd_queue = NULL;
     }
+
+
 
     return ESP_OK;
 }

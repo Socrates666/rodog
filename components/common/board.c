@@ -86,6 +86,23 @@ esp_err_t bsp_icm20948_init(void){
     return ESP_OK;
 }
 
+// Set ICM20948 output data rate (Hz)
+esp_err_t bsp_icm20948_set_rate(uint16_t hz){
+    if (hz == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Output Data Rate = 1.125kHz / (1 + divider)
+    float divider_f = (1125.0f / (float)hz) - 1.0f;
+    if (divider_f < 0.0f) divider_f = 0.0f;
+    if (divider_f > 255.0f) divider_f = 255.0f;
+
+    uint16_t divider = (uint16_t)(divider_f + 0.5f);
+    icm20948_gyro_sample_rate_divider((uint8_t)divider);
+    icm20948_accel_sample_rate_divider(divider);
+    return ESP_OK;
+}
+
 esp_err_t bsp_read_gyro(axises* data){
     icm20948_gyro_read_dps((axises*)data);
     if(data == NULL) return ESP_FAIL;

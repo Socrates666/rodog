@@ -1,0 +1,49 @@
+menu "AHRS Module"
+
+config AHRS_MODULE_ENABLE
+    bool "Enable AHRS module"
+    default y
+    help
+        Enable or disable AHRS algorithm module build.
+
+if AHRS_MODULE_ENABLE
+
+config AHRS_USE_MAG
+    bool "Enable magnetometer processing"
+    default y
+    help
+        Enable magnetometer calibration and data path.
+
+config AHRS_FILTER_MADGWICK
+    bool "Use Madgwick filter"
+    default y
+    help
+        Enable Madgwick attitude estimation.
+
+config AHRS_ENABLE_PIPELINE
+    bool "Enable optional AHRS pipeline"
+    default n
+    help
+        Enable internal periodic processing pipeline.
+
+config AHRS_PIPELINE_USE_FREERTOS
+    bool "AHRS pipeline backend uses FreeRTOS"
+    depends on AHRS_ENABLE_PIPELINE
+    default n
+
+config AHRS_DEFAULT_SAMPLE_RATE_HZ
+    int "Default sample rate (Hz)"
+    range 1 2000
+    default 200
+
+config AHRS_DEFAULT_MADGWICK_BETA
+    int "Default Madgwick beta (x1000)"
+    range 1 5000
+    default 80
+    help
+        Madgwick beta scaled by 1000.
+        Example: 80 = 0.080, 100 = 0.100.
+
+endif
+
+endmenu

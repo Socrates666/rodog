@@ -1,0 +1,28 @@
+set(AHRS_MODULE_DIR ${CMAKE_CURRENT_LIST_DIR})
+set(ahrs_srcs)
+
+if(CONFIG_AHRS_MODULE_ENABLE)
+    list(APPEND ahrs_srcs
+        ${AHRS_MODULE_DIR}/src/ahrs_core.c
+        ${AHRS_MODULE_DIR}/src/ahrs_calibration.c
+        ${AHRS_MODULE_DIR}/src/ahrs_adapter.c
+        ${AHRS_MODULE_DIR}/src/ahrs_pipeline.c
+    )
+endif()
+
+idf_component_register(
+    SRCS ${ahrs_srcs}
+    INCLUDE_DIRS ${AHRS_MODULE_DIR}/include
+    KCONFIG ${AHRS_MODULE_DIR}/Kconfig
+)
+
+target_compile_features(${COMPONENT_LIB} PRIVATE c_std_99)
+
+target_compile_definitions(${COMPONENT_LIB} PRIVATE
+    AHRS_CFG_USE_MAG=$<BOOL:${CONFIG_AHRS_USE_MAG}>
+    AHRS_CFG_FILTER_MADGWICK=$<BOOL:${CONFIG_AHRS_FILTER_MADGWICK}>
+    AHRS_CFG_ENABLE_PIPELINE=$<BOOL:${CONFIG_AHRS_ENABLE_PIPELINE}>
+    AHRS_CFG_PIPELINE_USE_FREERTOS=$<BOOL:${CONFIG_AHRS_PIPELINE_USE_FREERTOS}>
+    AHRS_CFG_DEFAULT_SAMPLE_RATE_HZ=${CONFIG_AHRS_DEFAULT_SAMPLE_RATE_HZ}
+    AHRS_CFG_DEFAULT_MADGWICK_BETA_MILLI=${CONFIG_AHRS_DEFAULT_MADGWICK_BETA}
+)
