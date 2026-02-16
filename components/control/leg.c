@@ -69,6 +69,10 @@ static void load_servo_bases(void) {
 }
 // 辅助函数：检查高度角范围是否合理
 static float clamp_height_angle(float height_angle) {
+    // Special case: allow 0 as "no stand-height offset" for DEBUG/manual modes.
+    if (height_angle <= 0.0f) {
+        return 0.0f;
+    }
     if(height_angle < WALK_HEIGHT_MIN_ANGLE) {
         height_angle = WALK_HEIGHT_MIN_ANGLE;
     }else if(height_angle > WALK_HEIGHT_MAX_ANGLE) {
@@ -94,7 +98,7 @@ static uint16_t angle_to_pwm(float angle){
     return (500+(angle/180)*2000)*50*4096/1000000;
 }
 // 驱动单个舵机到指定相对站立角度
-static void drive_servo_to_angle(uint8_t id, float angle){
+void drive_servo_to_angle(uint8_t id, float angle){
     uint16_t pwm = s_servo_base_pwm[id];
     float target_angle = pwm_to_angle(pwm);
     if(id != LEG_A_WAVE && id != LEG_D_WAVE && id != LEG_B_WAVE && id != LEG_C_WAVE){
@@ -249,11 +253,7 @@ static void wavego_task(void *pvParameters) {
         }
         switch (s_active_cmd.state) {
             case DEBUG:
-                if (last_state != s_active_cmd.state) {
-                    smooth_move_to_pose(s_active_cmd.state, &s_active_cmd, changeable_period);
-                } else {
-                    apply_debug_pose(&s_active_cmd);
-                }
+                control_leg_height(0.0f);
                 break;
             case INITIALIZING:
                 if (last_state != s_active_cmd.state) {
@@ -337,14 +337,10 @@ esp_err_t stop_wavego_task(void) {
         s_wavego_task_handle = NULL;
     }
 
-
-
     if (s_wavego_cmd_queue) {
         vQueueDelete(s_wavego_cmd_queue);
         s_wavego_cmd_queue = NULL;
     }
-
-
 
     return ESP_OK;
 }

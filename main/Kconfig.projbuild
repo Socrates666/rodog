@@ -1,5 +1,48 @@
 menu "Communication settings"
 
+    choice COMM_WEBSERVER_WIFI_MODE
+        prompt "WebServer WiFi mode"
+        default COMM_WEBSERVER_WIFI_MODE_AP
+        help
+            Select the WiFi mode used by web server at boot.
+
+        config COMM_WEBSERVER_WIFI_MODE_AP
+            bool "AP"
+            help
+                Start WiFi in Access Point (AP) mode.
+
+        config COMM_WEBSERVER_WIFI_MODE_STA
+            bool "STA"
+            help
+                Start WiFi in Station (STA) mode.
+
+    endchoice
+
+    config COMM_WEBSERVER_AP_SSID
+        string "AP SSID"
+        default "WAVESHARE Robot"
+        help
+            SSID used when WebServer starts in AP mode.
+
+    config COMM_WEBSERVER_AP_PASSWORD
+        string "AP password"
+        default "1234567890"
+        help
+            Password used when WebServer starts in AP mode.
+            Leave empty for open AP.
+
+    config COMM_WEBSERVER_STA_SSID
+        string "STA SSID"
+        default "OnePlus 8"
+        help
+            SSID used when WebServer starts in STA mode.
+
+    config COMM_WEBSERVER_STA_PASSWORD
+        string "STA password"
+        default "40963840"
+        help
+            Password used when WebServer starts in STA mode.
+
     config COMM_MICRO_ROS_UART_ENABLE
         bool "Enable micro-ROS UART module"
         default n
@@ -50,6 +93,8 @@ menu "Communication settings"
             Topic name for servo command subscription.
 
 endmenu
+
+source "../components/algorithms/ahrs_module/Kconfig"
 
 menu "Control settings"
 

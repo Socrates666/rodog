@@ -81,10 +81,10 @@ static void ensure_wavego_started(void) {
 }
 
 // WiFi 配置
-const char* AP_SSID = "WAVESHARE Robot";
-const char* AP_PWD  = "1234567890";
-const char* STA_SSID = "OnePlus 8";
-const char* STA_PWD  = "40963840";
+const char* AP_SSID = CONFIG_COMM_WEBSERVER_AP_SSID;
+const char* AP_PWD  = CONFIG_COMM_WEBSERVER_AP_PASSWORD;
+const char* STA_SSID = CONFIG_COMM_WEBSERVER_STA_SSID;
+const char* STA_PWD  = CONFIG_COMM_WEBSERVER_STA_PASSWORD;
 
 // 全局变量定义
 int WIFIP_MODE;
@@ -375,7 +375,7 @@ static esp_err_t cmd_handler(httpd_req_t *req) {
         s_func_mode = val;
         ensure_wavego_started();
 
-        int wave_height = 30;
+        int wave_height = height_int;
         int wave_speed = (cmdint > 0) ? cmdint : 50;
 
         if (val == 1) {
@@ -395,6 +395,10 @@ static esp_err_t cmd_handler(httpd_req_t *req) {
     }
     // 伺服调试模式
     else if (!strcmp(variable, "sset")) {
+        ensure_wavego_started();
+        if (send_wavego_command(0, 0, DEBUG) != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to enter DEBUG mode for calibration save");
+        }
         uint16_t current = 0;
         pca9685_get_pwm_value((uint8_t)val, &current);
         esp_err_t save_err = calibration_set_middle_pwm((uint8_t)val, current);
@@ -407,6 +411,10 @@ static esp_err_t cmd_handler(httpd_req_t *req) {
     } else if (!strcmp(variable, "ssetval")) {
         s_debug_mode = 1;
         s_func_mode = 0;
+        ensure_wavego_started();
+        if (send_wavego_command(0, 0, DEBUG) != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to enter DEBUG mode for PWM set");
+        }
         uint16_t target = (uint16_t)cmdint;
         if (pca9685_set_pwm_value((uint8_t)val, target) == ESP_OK) {
             ESP_LOGI(TAG, "Set servo %d to %u", val, target);
@@ -415,6 +423,10 @@ static esp_err_t cmd_handler(httpd_req_t *req) {
             res = -1;
         }
     } else if (!strcmp(variable, "sload")) {
+        ensure_wavego_started();
+        if (send_wavego_command(0, 0, DEBUG) != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to enter DEBUG mode for calibration load");
+        }
         esp_err_t load_err = calibration_load_from_nvs();
         if (load_err == ESP_OK) {
             reset_all_servos_to_middle();
@@ -424,6 +436,10 @@ static esp_err_t cmd_handler(httpd_req_t *req) {
             res = -1;
         }
     } else if (!strcmp(variable, "sreset")) {
+        ensure_wavego_started();
+        if (send_wavego_command(0, 0, DEBUG) != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to enter DEBUG mode for calibration reset");
+        }
         esp_err_t reset_err = calibration_reset_defaults();
         if (reset_err == ESP_OK) {
             reset_all_servos_to_middle();
@@ -431,6 +447,27 @@ static esp_err_t cmd_handler(httpd_req_t *req) {
         } else {
             ESP_LOGE(TAG, "Failed to reset calibration: %s", esp_err_to_name(reset_err));
             res = -1;
+        }
+    } else if (!strcmp(variable, "sangle")) {
+        // Set a single servo by angle (degrees)
+        s_debug_mode = 1;
+        s_func_mode = 0;
+
+        ensure_wavego_started();
+        if (send_wavego_command(0, 0, DEBUG) != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to enter DEBUG mode for servo angle");
+        }
+        
+        char *endp = NULL;
+        float angle = strtof(cmd, &endp);
+        if (endp == cmd) {
+            ESP_LOGW(TAG, "Invalid angle: %s", cmd);
+            res = -1;
+        } else {
+            if (angle < 0.0f) angle = 0.0f;
+            if (angle > 180.0f) angle = 180.0f;
+            drive_servo_to_angle((uint8_t)val, angle);
+            ESP_LOGI(TAG, "Set servo %d angle=%.1f", val, (double)angle);
         }
     }
     // 移动控制

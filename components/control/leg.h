@@ -80,7 +80,7 @@ esp_err_t start_wavego_task(void);
 esp_err_t stop_wavego_task(void);
 esp_err_t send_wavego_command(int wave_height, int wave_speed, ActionState state);
 ActionState get_current_action_state(void);
-
+void drive_servo_to_angle(uint8_t id, float angle);
 #ifdef __cplusplus
 }
 #endif

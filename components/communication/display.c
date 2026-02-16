@@ -103,10 +103,10 @@ static void update_display(void) {
 bool display_init(void) {
     ESP_LOGI(TAG, "Initializing display module");
 
-    if (bsp_ssd1306_init() != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize OLED");
-        return false;
-    }
+    // if (bsp_ssd1306_init() != ESP_OK) {
+    //     ESP_LOGE(TAG, "Failed to initialize OLED");
+    //     return false;
+    // }
 
     if (xTaskCreate(display_task, "display_task", 4 * 1024, NULL, 6, &g_display_task_handle) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create display task");
