@@ -1,2 +1,2 @@
 # Rodog
-WaveDog的esp32下位机固件
+Wavego的esp32下位机固件
